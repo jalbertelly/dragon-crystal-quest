@@ -7,13 +7,18 @@ from settings import (
     NATIVE_WIDTH, NATIVE_HEIGHT, WINDOW_WIDTH, WINDOW_HEIGHT,
     BLACK, STATE_CASTLE, STATE_PLAYING,
     MODAL_NONE, MODAL_DIALOG, MODAL_MISSION_BOARD, MODAL_ARMOR_SELECT,
+    MELEE_DAMAGE, TILE_SIZE,
 )
 from engine.input_handler import InputHandler
 from engine.camera import Camera
 from engine.game_data import GameData
 from entities.player import Player
+from entities.enemy import Enemy
 from world.castle import Castle
+from world.room import Room
 from world.interactive import InteractType
+from combat.melee import MeleeAttack
+from items.heart_drop import roll_heart_drop
 from ui.hud import HUD
 from ui.dialog import DialogBox
 from ui.mission_board import MissionBoard
@@ -46,6 +51,12 @@ class Game:
         self.armor_select = ArmorSelect()
         self.modal = MODAL_NONE
 
+        # Combat
+        self.melee = MeleeAttack()
+        self.enemies = []
+        self.heart_drops = []
+        self.dungeon_room = None  # set when entering a mission
+
         # Show opening scene on first visit to breakfast hall
         self._trigger_opening_scene()
 
@@ -70,6 +81,8 @@ class Game:
     def _update(self, dt):
         if self.state == STATE_CASTLE:
             self._update_castle(dt)
+        elif self.state == STATE_PLAYING:
+            self._update_playing(dt)
 
     def _update_castle(self, dt):
         # Modal UI captures all input
@@ -164,13 +177,121 @@ class Game:
             self.modal = MODAL_DIALOG
 
     def _start_mission(self, mission_id):
-        """Placeholder for starting a dungeon mission."""
-        names = {1: "Dragon Volcano", 2: "Frost Caves", 3: "Emerald Marsh"}
-        self.dialog.show(
-            f"Embarking to {names.get(mission_id, '???')}!\n"
-            "(Coming soon in Phase 4/5)"
+        """Enter a test dungeon room with enemies for combat testing."""
+        self.state = STATE_PLAYING
+        self.dungeon_room = self._create_test_dungeon()
+        self.player.teleport(5 * TILE_SIZE, 5 * TILE_SIZE)
+        self.enemies = self._spawn_test_enemies()
+        self.heart_drops = []
+        self.melee = MeleeAttack()
+        self.hud.room_label = "Test Dungeon"
+        self.camera.update(self.player, self.dungeon_room)
+
+    def _create_test_dungeon(self):
+        """Build a simple arena room for combat testing."""
+        layout = (
+            "####################\n"
+            "#..................#\n"
+            "#..................#\n"
+            "#..................#\n"
+            "#..................#\n"
+            "#..................#\n"
+            "#..................#\n"
+            "#..................#\n"
+            "#..................#\n"
+            "#..................#\n"
+            "#..................#\n"
+            "#..................#\n"
+            "#..................#\n"
+            "#..................#\n"
+            "####################"
         )
-        self.modal = MODAL_DIALOG
+        return Room.from_layout(layout)
+
+    def _spawn_test_enemies(self):
+        """Spawn a handful of enemies in the test dungeon."""
+        positions = [
+            (12 * TILE_SIZE, 4 * TILE_SIZE),
+            (15 * TILE_SIZE, 8 * TILE_SIZE),
+            (8 * TILE_SIZE, 11 * TILE_SIZE),
+            (14 * TILE_SIZE, 12 * TILE_SIZE),
+        ]
+        return [Enemy(x, y) for x, y in positions]
+
+    # -- playing state (dungeon combat) -----------------------------------
+
+    def _update_playing(self, dt):
+        """Update loop for the dungeon/combat state."""
+        if self.modal != MODAL_NONE:
+            self._update_modal()
+            return
+
+        if self.input.pause:
+            # Return to castle on pause (placeholder)
+            self.state = STATE_CASTLE
+            self.castle.current_room_name = "main_hall"
+            spawn_x, spawn_y = self.castle.get_spawn_pos("main_hall", "default")
+            self.player.teleport(spawn_x, spawn_y)
+            self.hud.room_label = self.castle.current_room_display
+            self.game_data.restore_hp()
+            return
+
+        room = self.dungeon_room
+
+        # Player movement
+        self.player.update(dt, self.input, room)
+
+        # Melee attack
+        self.melee.update(dt)
+        if self.input.attack:
+            self.melee.try_attack(self.player)
+
+        # Check melee hits on enemies
+        atk_hb = self.melee.get_hitbox()
+        if atk_hb:
+            for enemy in self.enemies:
+                if enemy.is_dead:
+                    continue
+                if self.melee.already_hit(enemy.id):
+                    continue
+                if atk_hb.colliderect(enemy.hitbox):
+                    self.melee.register_hit(enemy.id)
+                    died = enemy.take_damage(MELEE_DAMAGE)
+                    if died:
+                        drop = roll_heart_drop(*enemy.center)
+                        if drop:
+                            self.heart_drops.append(drop)
+
+        # Update enemies (authoritative damage to player)
+        for enemy in self.enemies:
+            enemy.update(dt, self.player, room, self.game_data)
+
+        # Remove dead enemies
+        self.enemies = [e for e in self.enemies if not e.is_dead]
+
+        # Update heart drops
+        for drop in self.heart_drops:
+            drop.update(dt)
+            drop.try_pickup(self.player.hitbox, self.game_data)
+        self.heart_drops = [d for d in self.heart_drops if d.alive]
+
+        # Check player death
+        if self.game_data.hp <= 0:
+            self.dialog.show(
+                "You have been defeated!\n"
+                "Returning to Dragon Castle..."
+            )
+            self.modal = MODAL_DIALOG
+            self.state = STATE_CASTLE
+            self.castle.current_room_name = "main_hall"
+            spawn_x, spawn_y = self.castle.get_spawn_pos("main_hall", "default")
+            self.player.teleport(spawn_x, spawn_y)
+            self.hud.room_label = self.castle.current_room_display
+            self.game_data.restore_hp()
+            return
+
+        # Camera
+        self.camera.update(self.player, room)
 
     # -- opening scene ----------------------------------------------------
 
@@ -208,16 +329,33 @@ class Game:
             self.castle.current_room.draw(self.native_surface, self.camera)
             self.player.draw(self.native_surface, self.camera)
 
-            # HUD (always on top of game world)
-            self.hud.draw(self.native_surface, self.game_data)
+        elif self.state == STATE_PLAYING and self.dungeon_room:
+            self.dungeon_room.draw(self.native_surface, self.camera)
 
-            # Modal overlays
-            if self.modal == MODAL_DIALOG:
-                self.dialog.draw(self.native_surface)
-            elif self.modal == MODAL_MISSION_BOARD:
-                self.mission_board.draw(self.native_surface, self.game_data)
-            elif self.modal == MODAL_ARMOR_SELECT:
-                self.armor_select.draw(self.native_surface, self.game_data)
+            # Draw heart drops (under entities)
+            for drop in self.heart_drops:
+                drop.draw(self.native_surface, self.camera)
+
+            # Draw enemies
+            for enemy in self.enemies:
+                enemy.draw(self.native_surface, self.camera)
+
+            # Draw player
+            self.player.draw(self.native_surface, self.camera)
+
+            # Draw melee attack hitbox
+            self.melee.draw(self.native_surface, self.camera)
+
+        # HUD (always on top of game world)
+        self.hud.draw(self.native_surface, self.game_data)
+
+        # Modal overlays
+        if self.modal == MODAL_DIALOG:
+            self.dialog.draw(self.native_surface)
+        elif self.modal == MODAL_MISSION_BOARD:
+            self.mission_board.draw(self.native_surface, self.game_data)
+        elif self.modal == MODAL_ARMOR_SELECT:
+            self.armor_select.draw(self.native_surface, self.game_data)
 
         # Scale pixel-art surface to window
         scaled = pygame.transform.scale(self.native_surface,

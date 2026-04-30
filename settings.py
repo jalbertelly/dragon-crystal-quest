@@ -82,3 +82,39 @@ MODAL_ARMOR_SELECT = "armor_select"
 
 # Door transition cooldown (seconds)
 DOOR_COOLDOWN = 0.3
+
+# Combat — Melee
+MELEE_COOLDOWN = 0.3       # seconds between swings
+MELEE_DURATION = 0.15      # seconds the hitbox stays active
+MELEE_RANGE = TILE_SIZE    # 1 tile in front of player
+MELEE_DAMAGE = 1
+
+# Combat — Invincibility frames
+INVINCIBILITY_DURATION = 1.0   # seconds of i-frames after taking damage
+FLASH_INTERVAL = 0.1           # seconds per visibility toggle during i-frames
+
+# Combat — Enemies
+ENEMY_DETECTION_RANGE = 80     # pixels — switch to chase
+ENEMY_ATTACK_RANGE = 18        # pixels — close enough to melee
+ENEMY_ATTACK_COOLDOWN = 1.0    # seconds between enemy attacks
+ENEMY_IDLE_MIN = 0.5
+ENEMY_IDLE_MAX = 2.0
+ENEMY_PATROL_MIN = 1.0
+ENEMY_PATROL_MAX = 3.0
+ENEMY_DEFAULT_SPEED = 40       # pixels per second
+ENEMY_DEFAULT_HP = 3
+ENEMY_DEFAULT_DAMAGE = 1
+
+# Combat — Health drops
+HEART_SMALL_HEAL = 1
+HEART_LARGE_HEAL = 3
+HEART_DROP_CHANCE_LARGE = 0.05   # 5% chance for large heart
+HEART_DROP_CHANCE_SMALL = 0.30   # 30% chance for small heart (else nothing)
+HEART_DROP_LIFETIME = 10.0       # seconds before despawn
+
+# Combat — Colors
+ENEMY_COLOR = (180, 50, 180)
+ENEMY_HURT_COLOR = (255, 255, 255)
+MELEE_COLOR = (255, 255, 100)
+HEART_SMALL_COLOR = (255, 100, 100)
+HEART_LARGE_COLOR = (255, 50, 50)

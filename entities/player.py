@@ -1,4 +1,4 @@
-"""Player entity — movement, collision, interaction, and placeholder rendering."""
+"""Player entity — movement, collision, interaction, combat, and placeholder rendering."""
 
 import pygame
 from settings import (
@@ -7,6 +7,7 @@ from settings import (
     RED, WHITE, TEAL,
     DIR_UP, DIR_DOWN, DIR_LEFT, DIR_RIGHT,
     TILE_SIZE,
+    INVINCIBILITY_DURATION, FLASH_INTERVAL,
 )
 
 
@@ -33,9 +34,26 @@ class Player:
                                   PLAYER_HITBOX_WIDTH,
                                   PLAYER_HITBOX_HEIGHT)
 
+        # Combat state
+        self.i_frame_timer = 0.0       # remaining invincibility time
+        self._flash_timer = 0.0        # tracks flash toggling
+        self._visible = True           # sprite visibility during i-frames
+        self.attacking = False         # true during active melee swing
+
     # -- update -----------------------------------------------------------
 
     def update(self, dt, inp, room):
+        # Tick i-frame timers
+        if self.i_frame_timer > 0:
+            self.i_frame_timer = max(0, self.i_frame_timer - dt)
+            self._flash_timer += dt
+            if self._flash_timer >= FLASH_INTERVAL:
+                self._flash_timer -= FLASH_INTERVAL
+                self._visible = not self._visible
+            if self.i_frame_timer <= 0:
+                self._visible = True
+                self._flash_timer = 0.0
+
         dx, dy = 0.0, 0.0
 
         if inp.move_up:
@@ -95,6 +113,21 @@ class Player:
         self.hitbox.y = (int(self.y) + PLAYER_SPRITE_HEIGHT
                          - PLAYER_HITBOX_HEIGHT)
 
+    # -- combat -----------------------------------------------------------
+
+    @property
+    def is_invincible(self):
+        return self.i_frame_timer > 0
+
+    def take_damage(self, amount, game_data):
+        """Apply damage if not invincible. Returns True if player died."""
+        if self.is_invincible:
+            return False
+        self.i_frame_timer = INVINCIBILITY_DURATION
+        self._flash_timer = 0.0
+        self._visible = True
+        return game_data.take_damage(amount)
+
     # -- interaction ------------------------------------------------------
 
     def get_interact_rect(self):
@@ -119,6 +152,9 @@ class Player:
     # -- draw -------------------------------------------------------------
 
     def draw(self, surface, camera):
+        if not self._visible:
+            return
+
         draw_rect = camera.apply(self.sprite_rect)
         pygame.draw.rect(surface, self.color, draw_rect)
 
