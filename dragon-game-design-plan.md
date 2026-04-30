@@ -471,7 +471,7 @@ DragonGame/
 10. ✅ Build the Mission Board interaction (start mission)
 11. ✅ Implement Breakfast Hall (HP restore + opening scene)
 
-### Phase 3 — Combat System ⚔️ 🔧 IN PROGRESS
+### Phase 3 — Combat System ⚔️ ✅ COMPLETE
 12. ✅ Implement melee attack with hitbox and cooldown
 13. ✅ Create base enemy class with AI state machine (idle, patrol, chase, attack)
 14. ✅ Implement damage system with HP and invincibility frames
