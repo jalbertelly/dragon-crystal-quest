@@ -70,12 +70,12 @@ def _parse_template(layout_str, theme):
 
     clean_layout = "\n".join(clean_lines)
 
-    # Compute safe player spawn: one tile above the entry door
+    # Compute safe player spawn: two tiles above the entry door so the
+    # 24-px-tall sprite (1.5 tiles) doesn't overlap the bottom wall.
     if entry_tiles:
         mid_x = sum(t[0] for t in entry_tiles) / len(entry_tiles)
         entry_y = entry_tiles[0][1]
-        # Spawn one tile inside the room, centred on entry
-        entry_pos = (int(mid_x) * TILE_SIZE + 2, (entry_y - 1) * TILE_SIZE)
+        entry_pos = (int(mid_x) * TILE_SIZE + 2, (entry_y - 2) * TILE_SIZE)
     else:
         # Fallback: centre of the room
         height = len(clean_lines)
