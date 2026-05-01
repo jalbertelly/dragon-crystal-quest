@@ -70,7 +70,7 @@ SPAWN_POINTS = {
         "default": (6, 6),
     },
     "armory": {
-        "from_main": (2, 10),
+        "from_main": (2, 9),
         "default": (6, 6),
     },
 }
