@@ -11,6 +11,11 @@ from settings import (
     TABLE_COLOR, FOOD_COLOR,
     ARMOR_RACK_COLOR, BOARD_COLOR, BANNER_COLOR, TORCH_COLOR,
     WHITE,
+    LAVA_COLOR, LAVA_COLOR_ALT, LAVA_GLOW,
+    ICE_COLOR, ICE_COLOR_ALT, ICE_SHINE,
+    POISON_COLOR, POISON_COLOR_ALT, POISON_BUBBLE,
+    CHEST_COLOR, CHEST_BAND_COLOR, CHEST_OPEN_COLOR,
+    DOOR_LOCKED_COLOR, DOOR_LOCKED_BAND,
 )
 
 
@@ -28,6 +33,12 @@ class TileType(Enum):
     MISSION_BOARD = 10
     BANNER = 11
     TORCH = 12
+    HAZARD_LAVA = 13
+    HAZARD_ICE = 14
+    HAZARD_POISON = 15
+    CHEST_CLOSED = 16
+    CHEST_OPEN = 17
+    DOOR_LOCKED = 18
 
 # Tile types that block movement
 SOLID_TILES = {
@@ -35,6 +46,15 @@ SOLID_TILES = {
     TileType.ARMOR_RACK, TileType.MISSION_BOARD,
     TileType.BANNER, TileType.PEDESTAL_EMPTY,
     TileType.PEDESTAL_RED, TileType.PEDESTAL_BLUE, TileType.PEDESTAL_GREEN,
+    TileType.CHEST_CLOSED, TileType.CHEST_OPEN,
+    TileType.DOOR_LOCKED,
+}
+
+# Tile types that are environmental hazards
+HAZARD_TILES = {
+    TileType.HAZARD_LAVA,
+    TileType.HAZARD_ICE,
+    TileType.HAZARD_POISON,
 }
 
 # Single-char codes for ASCII room layouts
@@ -152,3 +172,66 @@ class Tile:
                              pygame.Rect(x + 6, y + 3, 4, 5))
             pygame.draw.rect(surface, WHITE,
                              pygame.Rect(x + 7, y + 4, 2, 3))
+
+        elif self.type == TileType.HAZARD_LAVA:
+            alt = (self.grid_x + self.grid_y) % 2 == 0
+            color = LAVA_COLOR if alt else LAVA_COLOR_ALT
+            pygame.draw.rect(surface, color, draw_rect)
+            # Lava glow highlight
+            pygame.draw.rect(surface, LAVA_GLOW,
+                             pygame.Rect(x + 4, y + 3, 5, 4))
+
+        elif self.type == TileType.HAZARD_ICE:
+            alt = (self.grid_x + self.grid_y) % 2 == 0
+            color = ICE_COLOR if alt else ICE_COLOR_ALT
+            pygame.draw.rect(surface, color, draw_rect)
+            # Ice shine
+            pygame.draw.line(surface, ICE_SHINE,
+                             (x + 3, y + 2), (x + 7, y + 6))
+            pygame.draw.line(surface, ICE_SHINE,
+                             (x + 9, y + 4), (x + 12, y + 8))
+
+        elif self.type == TileType.HAZARD_POISON:
+            alt = (self.grid_x + self.grid_y) % 2 == 0
+            color = POISON_COLOR if alt else POISON_COLOR_ALT
+            pygame.draw.rect(surface, color, draw_rect)
+            # Poison bubbles
+            pygame.draw.circle(surface, POISON_BUBBLE,
+                               (x + 5, y + 6), 2)
+            pygame.draw.circle(surface, POISON_BUBBLE,
+                               (x + 11, y + 9), 1)
+
+        elif self.type == TileType.CHEST_CLOSED:
+            pygame.draw.rect(surface, FLOOR_COLOR, draw_rect)
+            # Chest body
+            chest = pygame.Rect(x + 2, y + 4, s - 4, s - 5)
+            pygame.draw.rect(surface, CHEST_COLOR, chest)
+            pygame.draw.rect(surface, CHEST_BAND_COLOR, chest, 1)
+            # Chest lid
+            lid = pygame.Rect(x + 1, y + 2, s - 2, 4)
+            pygame.draw.rect(surface, CHEST_COLOR, lid)
+            pygame.draw.rect(surface, CHEST_BAND_COLOR, lid, 1)
+            # Lock
+            pygame.draw.rect(surface, WHITE,
+                             pygame.Rect(x + 6, y + 6, 4, 3))
+
+        elif self.type == TileType.CHEST_OPEN:
+            pygame.draw.rect(surface, FLOOR_COLOR, draw_rect)
+            # Open chest body
+            chest = pygame.Rect(x + 2, y + 6, s - 4, s - 7)
+            pygame.draw.rect(surface, CHEST_OPEN_COLOR, chest)
+            pygame.draw.rect(surface, CHEST_BAND_COLOR, chest, 1)
+            # Open lid (tilted back)
+            lid = pygame.Rect(x + 1, y + 1, s - 2, 5)
+            pygame.draw.rect(surface, CHEST_OPEN_COLOR, lid)
+            pygame.draw.rect(surface, CHEST_BAND_COLOR, lid, 1)
+
+        elif self.type == TileType.DOOR_LOCKED:
+            pygame.draw.rect(surface, DOOR_LOCKED_COLOR, draw_rect)
+            # Iron bands
+            pygame.draw.rect(surface, DOOR_LOCKED_BAND, draw_rect, 2)
+            # Lock symbol
+            pygame.draw.rect(surface, DOOR_LOCKED_BAND,
+                             pygame.Rect(x + 5, y + 5, 6, 5))
+            pygame.draw.rect(surface, WHITE,
+                             pygame.Rect(x + 7, y + 7, 2, 2))

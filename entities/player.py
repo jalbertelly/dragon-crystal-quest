@@ -42,7 +42,7 @@ class Player:
 
     # -- update -----------------------------------------------------------
 
-    def update(self, dt, inp, room):
+    def update(self, dt, inp, room, speed_mult=1.0):
         # Tick i-frame timers
         if self.i_frame_timer > 0:
             self.i_frame_timer = max(0, self.i_frame_timer - dt)
@@ -54,19 +54,20 @@ class Player:
                 self._visible = True
                 self._flash_timer = 0.0
 
+        effective_speed = self.speed * speed_mult
         dx, dy = 0.0, 0.0
 
         if inp.move_up:
-            dy -= self.speed * dt
+            dy -= effective_speed * dt
             self.direction = DIR_UP
         if inp.move_down:
-            dy += self.speed * dt
+            dy += effective_speed * dt
             self.direction = DIR_DOWN
         if inp.move_left:
-            dx -= self.speed * dt
+            dx -= effective_speed * dt
             self.direction = DIR_LEFT
         if inp.move_right:
-            dx += self.speed * dt
+            dx += effective_speed * dt
             self.direction = DIR_RIGHT
 
         # Normalise diagonal movement so it isn't faster

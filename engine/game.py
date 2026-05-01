@@ -8,6 +8,8 @@ from settings import (
     BLACK, STATE_CASTLE, STATE_PLAYING,
     MODAL_NONE, MODAL_DIALOG, MODAL_MISSION_BOARD, MODAL_ARMOR_SELECT,
     MELEE_DAMAGE, TILE_SIZE,
+    PLAYER_SPEED, HAZARD_ICE_SPEED_MULT,
+    MISSION_CRYSTAL,
 )
 from engine.input_handler import InputHandler
 from engine.camera import Camera
@@ -17,6 +19,9 @@ from entities.enemy import Enemy
 from world.castle import Castle
 from world.room import Room
 from world.interactive import InteractType
+from world.dungeon_generator import Dungeon
+from world.hazard import HazardTracker
+from world.tile import TileType
 from combat.melee import MeleeAttack
 from items.heart_drop import roll_heart_drop
 from ui.hud import HUD
@@ -56,6 +61,9 @@ class Game:
         self.enemies = []
         self.heart_drops = []
         self.dungeon_room = None  # set when entering a mission
+        self.dungeon = None       # Dungeon instance for current mission
+        self.hazard_tracker = HazardTracker()
+        self._on_exit_door = False  # debounce for dungeon room transitions
 
         # Show opening scene on first visit to breakfast hall
         self._trigger_opening_scene()
@@ -177,46 +185,54 @@ class Game:
             self.modal = MODAL_DIALOG
 
     def _start_mission(self, mission_id):
-        """Enter a test dungeon room with enemies for combat testing."""
+        """Generate a procedural dungeon and enter the first room."""
         self.state = STATE_PLAYING
-        self.dungeon_room = self._create_test_dungeon()
-        self.player.teleport(5 * TILE_SIZE, 5 * TILE_SIZE)
-        self.enemies = self._spawn_test_enemies()
+        self.dungeon = Dungeon(mission_id)
+        self._enter_dungeon_room(0)
+
+    def _enter_dungeon_room(self, room_index):
+        """Set up a dungeon room for play: spawn enemies, configure doors."""
+        self.dungeon.current_room_index = room_index
+        droom = self.dungeon.current_room
+
+        # Set the active room for rendering / collision
+        self.dungeon_room = droom.room
+
+        # Teleport player to entry position
+        self.player.teleport(*droom.entry_pos)
+
+        # Seal entry door (one-way progression)
+        droom.seal_entry()
+
+        # Spawn enemies from template spawn points
+        hp, dmg = droom.get_enemy_config()
+        self.enemies = []
+        for ex, ey in droom.enemy_spawns:
+            enemy = Enemy(ex, ey, hp=hp, damage=dmg)
+            self.enemies.append(enemy)
+
+        # Lock exit if enemies are present
+        if self.enemies and droom.exit_tiles:
+            droom.lock_exit()
+        elif not self.enemies and droom.exit_tiles:
+            droom.unlock_exit()
+
         self.heart_drops = []
         self.melee = MeleeAttack()
-        self.hud.room_label = "Test Dungeon"
+        self.hazard_tracker = HazardTracker()
+        self._on_exit_door = False
+
+        # HUD label
+        room_num = room_index + 1
+        total = self.dungeon.total_rooms
+        if droom.room_type == "mini_boss":
+            self.hud.room_label = "Mini-Boss Chamber"
+        elif droom.room_type == "boss":
+            self.hud.room_label = "Boss Chamber"
+        else:
+            self.hud.room_label = f"Room {room_num}/{total}"
+
         self.camera.update(self.player, self.dungeon_room)
-
-    def _create_test_dungeon(self):
-        """Build a simple arena room for combat testing."""
-        layout = (
-            "####################\n"
-            "#..................#\n"
-            "#..................#\n"
-            "#..................#\n"
-            "#..................#\n"
-            "#..................#\n"
-            "#..................#\n"
-            "#..................#\n"
-            "#..................#\n"
-            "#..................#\n"
-            "#..................#\n"
-            "#..................#\n"
-            "#..................#\n"
-            "#..................#\n"
-            "####################"
-        )
-        return Room.from_layout(layout)
-
-    def _spawn_test_enemies(self):
-        """Spawn a handful of enemies in the test dungeon."""
-        positions = [
-            (12 * TILE_SIZE, 4 * TILE_SIZE),
-            (15 * TILE_SIZE, 8 * TILE_SIZE),
-            (8 * TILE_SIZE, 11 * TILE_SIZE),
-            (14 * TILE_SIZE, 12 * TILE_SIZE),
-        ]
-        return [Enemy(x, y) for x, y in positions]
 
     # -- playing state (dungeon combat) -----------------------------------
 
@@ -227,19 +243,23 @@ class Game:
             return
 
         if self.input.pause:
-            # Return to castle on pause (placeholder)
-            self.state = STATE_CASTLE
-            self.castle.current_room_name = "main_hall"
-            spawn_x, spawn_y = self.castle.get_spawn_pos("main_hall", "default")
-            self.player.teleport(spawn_x, spawn_y)
-            self.hud.room_label = self.castle.current_room_display
-            self.game_data.restore_hp()
+            self._return_to_castle()
             return
 
         room = self.dungeon_room
+        droom = self.dungeon.current_room
 
-        # Player movement
-        self.player.update(dt, self.input, room)
+        # Hazard check (ice affects movement speed)
+        on_ice = self.hazard_tracker.update(
+            dt, self.player, room, self.game_data
+        )
+
+        # Player movement (with ice speed modifier)
+        if on_ice:
+            self.player.update(dt, self.input, room,
+                               speed_mult=HAZARD_ICE_SPEED_MULT)
+        else:
+            self.player.update(dt, self.input, room)
 
         # Melee attack
         self.melee.update(dt)
@@ -269,6 +289,40 @@ class Game:
         # Remove dead enemies
         self.enemies = [e for e in self.enemies if not e.is_dead]
 
+        # Room cleared detection — unlock exit doors
+        if not droom.cleared and len(self.enemies) == 0:
+            droom.cleared = True
+            if droom.exit_tiles:
+                droom.unlock_exit()
+                self.dialog.show("Room cleared!\nThe way forward opens...")
+                self.modal = MODAL_DIALOG
+
+        # Chest interaction
+        if self.input.interact and droom.chest and not droom.chest.opened:
+            interact_rect = self.player.get_interact_rect()
+            armor_id = droom.chest.try_open(interact_rect, room, self.game_data)
+            if armor_id:
+                name = armor_id.replace('_', ' ').title()
+                self.dialog.show(
+                    f"Found {name}!\n"
+                    "Added to your armor collection."
+                )
+                self.modal = MODAL_DIALOG
+
+        # Exit door transition (with debounce)
+        if droom.cleared and droom.exit_tiles:
+            exit_rects = droom.get_exit_rects()
+            on_exit = any(
+                self.player.hitbox.colliderect(r) for r in exit_rects
+            )
+            if on_exit and not self._on_exit_door:
+                self._on_exit_door = True
+                if not self.dungeon.is_last_room:
+                    self.dungeon.advance_room()
+                    self._enter_dungeon_room(self.dungeon.current_room_index)
+            elif not on_exit:
+                self._on_exit_door = False
+
         # Update heart drops
         for drop in self.heart_drops:
             drop.update(dt)
@@ -277,21 +331,59 @@ class Game:
 
         # Check player death
         if self.game_data.hp <= 0:
-            self.dialog.show(
-                "You have been defeated!\n"
-                "Returning to Dragon Castle..."
-            )
-            self.modal = MODAL_DIALOG
-            self.state = STATE_CASTLE
-            self.castle.current_room_name = "main_hall"
-            spawn_x, spawn_y = self.castle.get_spawn_pos("main_hall", "default")
-            self.player.teleport(spawn_x, spawn_y)
-            self.hud.room_label = self.castle.current_room_display
-            self.game_data.restore_hp()
+            self._on_player_death()
+            return
+
+        # Boss room cleared — mission complete
+        if droom.room_type == "boss" and droom.cleared:
+            self._on_mission_complete()
             return
 
         # Camera
         self.camera.update(self.player, room)
+
+    def _return_to_castle(self):
+        """Transition back to the castle hub."""
+        self.state = STATE_CASTLE
+        self.dungeon = None
+        self.dungeon_room = None
+        self.castle.current_room_name = "main_hall"
+        spawn_x, spawn_y = self.castle.get_spawn_pos("main_hall", "default")
+        self.player.teleport(spawn_x, spawn_y)
+        self.hud.room_label = self.castle.current_room_display
+        self.game_data.restore_hp()
+
+    def _on_player_death(self):
+        """Handle player dying in a dungeon."""
+        self.dialog.show(
+            "You have been defeated!\n"
+            "Returning to Dragon Castle..."
+        )
+        self.modal = MODAL_DIALOG
+        self._return_to_castle()
+
+    def _on_mission_complete(self):
+        """Handle completing a dungeon mission."""
+        mission_id = self.dungeon.mission_id
+
+        # Award crystal and mark mission complete
+        crystal = MISSION_CRYSTAL.get(mission_id)
+        if crystal:
+            self.game_data.collect_crystal(crystal)
+        self.game_data.complete_mission(mission_id)
+
+        # Update castle pedestals
+        self.castle.update_pedestals(self.game_data)
+
+        crystal_names = {"red": "Red", "blue": "Blue", "green": "Green"}
+        cname = crystal_names.get(crystal, "")
+
+        self.dialog.show(
+            f"Victory!  {cname} Crystal obtained!\n"
+            "Returning to Dragon Castle..."
+        )
+        self.modal = MODAL_DIALOG
+        self._return_to_castle()
 
     # -- opening scene ----------------------------------------------------
 

@@ -48,10 +48,14 @@ dragon-crystal-quest/
 ├── requirements.txt         # Dependencies
 ├── engine/                  # Core systems (game loop, camera, input)
 ├── entities/                # Player, enemies, NPCs
-├── world/                   # Dungeon generation, rooms, tiles
+├── world/                   # Dungeon generation, rooms, tiles, hazards
+│   ├── dungeon_generator.py # Procedural 9-room dungeon builder
+│   ├── room_templates.py    # ASCII room templates (12 variants)
+│   └── hazard.py            # Environmental hazard damage tracker
 ├── combat/                  # Melee, special attacks, damage
 ├── ui/                      # HUD, menus, dialog
-├── items/                   # Armor, crystals, loot drops
+├── items/                   # Armor, crystals, loot drops, chests
+│   └── chest.py             # Treasure chest with armor loot
 └── assets/                  # Sprites, tilesets, sounds, music
 ```
 
@@ -84,7 +88,12 @@ python main.py
 
 ## 🛠️ Development Status
 
-The game is actively in development. Phase 1 (Foundation) is complete — the game loop, state machine, player movement, camera system, and tile-based rendering are all functional with placeholder art.
+The game is actively in development. Phases 1–4 are complete:
+
+- **Phase 1 — Foundation:** Game loop, state machine, player movement, camera system, tile-based rendering with placeholder pixel art.
+- **Phase 2 — Castle Hub:** Multi-room Dragon Castle with door transitions, Breakfast Hall (HP restore), Armory (equip armor), Mission Board (start quests), and crystal pedestals.
+- **Phase 3 — Combat System:** Melee attacks with hitbox and cooldown, enemy AI state machine (idle/patrol/chase/attack), damage system with HP and invincibility frames, health drops from enemies.
+- **Phase 4 — Dungeon Generation:** Procedural 9-room dungeons (4 normal → mini-boss → 3 hard → boss), 12 ASCII room templates (arena, corridor, L-shape, pillared, hazard, mini-boss, boss), door/lock system (clear enemies to unlock exit), environmental hazards (lava damage, ice speed-up, poison damage), and treasure chests with mission-specific armor loot.
 
 See [dragon-game-design-plan.md](dragon-game-design-plan.md) for the full design document and implementation roadmap.
 

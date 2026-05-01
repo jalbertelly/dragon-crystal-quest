@@ -118,3 +118,60 @@ ENEMY_HURT_COLOR = (255, 255, 255)
 MELEE_COLOR = (255, 255, 100)
 HEART_SMALL_COLOR = (255, 100, 100)
 HEART_LARGE_COLOR = (255, 50, 50)
+
+# Dungeon generation
+DUNGEON_ROOMS_PRE_BOSS = 4
+DUNGEON_ROOMS_POST_BOSS = 3
+
+# Dungeon enemy counts per room type
+DUNGEON_ENEMY_MIN = 2
+DUNGEON_ENEMY_MAX = 5
+DUNGEON_ENEMY_HARD_MIN = 3
+DUNGEON_ENEMY_HARD_MAX = 6
+DUNGEON_MINI_BOSS_MOBS = 2      # escort mobs in mini-boss room
+DUNGEON_BOSS_MOBS = 3            # escort mobs in boss room
+
+# Hazard settings
+HAZARD_DAMAGE = 1
+HAZARD_LAVA_INTERVAL = 0.5      # seconds between lava damage ticks
+HAZARD_POISON_INTERVAL = 1.0    # seconds between poison damage ticks
+HAZARD_ICE_SPEED_MULT = 1.6     # player speed multiplier on ice
+
+# Hazard colors
+LAVA_COLOR = (200, 60, 20)
+LAVA_COLOR_ALT = (180, 40, 10)
+LAVA_GLOW = (255, 120, 30)
+ICE_COLOR = (180, 220, 255)
+ICE_COLOR_ALT = (160, 200, 240)
+ICE_SHINE = (220, 240, 255)
+POISON_COLOR = (80, 140, 40)
+POISON_COLOR_ALT = (60, 120, 30)
+POISON_BUBBLE = (120, 200, 60)
+
+# Chest colors
+CHEST_COLOR = (160, 120, 40)
+CHEST_BAND_COLOR = (120, 80, 20)
+CHEST_OPEN_COLOR = (130, 100, 35)
+
+# Dungeon door colors
+DOOR_LOCKED_COLOR = (100, 50, 50)
+DOOR_LOCKED_BAND = (70, 30, 30)
+
+# Dungeon themes
+THEME_VOLCANO = "volcano"
+THEME_FROST = "frost"
+THEME_MARSH = "marsh"
+
+# Mission-to-armor mapping
+MISSION_ARMOR = {
+    1: "volcanic_scale_mail",
+    2: "frostguard_plate",
+    3: "thornweave_armor",
+}
+
+# Mission-to-crystal mapping
+MISSION_CRYSTAL = {
+    1: "red",
+    2: "blue",
+    3: "green",
+}
