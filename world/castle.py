@@ -66,7 +66,7 @@ SPAWN_POINTS = {
         "default": (9, 8),
     },
     "breakfast_hall": {
-        "from_main": (11, 10),
+        "from_main": (11, 9),
         "default": (6, 6),
     },
     "armory": {
